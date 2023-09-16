@@ -1,8 +1,8 @@
 package natser_test
 
 import (
-	"errors"
-	"testing"
+	"fmt"
+	"log"
 
 	"github.com/m1ome/natser"
 )
@@ -17,65 +17,40 @@ type (
 	}
 )
 
-func TestNatser(t *testing.T) {
-	t.Run("correct workflow", func(t *testing.T) {
-		server, err := natser.New("0.0.0.0:4222")
-		if err != nil {
-			t.Fatalf("error connecting to nats: %v", err)
+func ExampleNew() {
+	server, err := natser.New("0.0.0.0:4222")
+	if err != nil {
+		log.Fatalf("error connecting to nats: %v", err)
+	}
+
+	server.AddHandler("ping", func(r *natser.Request) error {
+		var req Req
+		if err := r.Unmarshal(&req); err != nil {
+			return err
 		}
 
-		server.AddHandler("ping", func(r *natser.Request) error {
-			var req Req
-			if err := r.Parse(req); err != nil {
-				return err
-			}
-
-			res := Res{Verified: req.Age >= 18}
-			return r.Json(res)
-		})
-
-		if err := server.Serve(); err != nil {
-			t.Fatalf("error serving: %v", err)
-		}
-
-		req := Req{Name: "John Doe", Age: 23}
-		var res Res
-		if err := server.MakeRequest("ping", req, res); err != nil {
-			t.Fatalf("error making request: %v", err)
-		}
-
-		if res.Verified {
-			t.Fatalf("error on response, data missmatch")
-		}
-
-		if err := server.Stop(); err != nil {
-			t.Fatalf("error on stopping server: %v", err)
-		}
+		res := Res{Verified: req.Age >= 18}
+		return r.SendResponse(res)
 	})
 
-	t.Run("bad workflow", func(t *testing.T) {
-		server, err := natser.New("0.0.0.0:4222")
-		if err != nil {
-			t.Fatalf("error connecting to nats: %v", err)
-		}
+	if err := server.Serve(); err != nil {
+		log.Fatalf("error serving: %v", err)
+	}
 
-		server.AddHandler("ping", func(r *natser.Request) error {
-			return errors.New("i am an error")
-		})
+	req := Req{Name: "John Doe", Age: 23}
+	var res Res
+	if err := server.MakeRequest("ping", req, &res); err != nil {
+		log.Fatalf("error making request: %v", err)
+	}
 
-		if err := server.Serve(); err != nil {
-			t.Fatalf("error serving: %v", err)
-		}
+	if !res.Verified {
+		log.Fatalf("error on response, data missmatch")
+	}
 
-		req := Req{Name: "John Doe", Age: 23}
-		var res Res
-		err = server.MakeRequest("ping", req, res)
-		if err == nil || err.Error() != "i am an error" {
-			t.Fatalf("wanna error on response, got wrong one: %v", err)
-		}
+	if err := server.Stop(); err != nil {
+		log.Fatalf("error on stopping server: %v", err)
+	}
 
-		if err := server.Stop(); err != nil {
-			t.Fatalf("error on stopping server: %v", err)
-		}
-	})
+	fmt.Printf("Verified: %t", res.Verified)
+	// Output: Verified: true
 }

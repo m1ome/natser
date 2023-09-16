@@ -16,11 +16,11 @@ func (r *Request) Method() string {
 	return r.method
 }
 
-func (r *Request) Parse(v interface{}) error {
-	return json.Unmarshal(r.body, &v)
+func (r *Request) Unmarshal(v interface{}) error {
+	return json.Unmarshal(r.body, v)
 }
 
-func (r *Request) Json(v interface{}) error {
+func (r *Request) SendResponse(v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err

@@ -25,6 +25,8 @@ type (
 	Handler func(req *Request) error
 )
 
+// New creates a new Server instance, with a connection to nats
+// you should provide url in format `localhost:4222`.
 func New(url string) (*Server, error) {
 	nc, err := nats.Connect(url)
 	if err != nil {
@@ -40,6 +42,7 @@ func New(url string) (*Server, error) {
 	return s, nil
 }
 
+// MakeRequest submits a request and waits for response
 func (s *Server) MakeRequest(method string, body interface{}, v interface{}) error {
 	reqData, err := json.Marshal(body)
 	if err != nil {
@@ -55,15 +58,17 @@ func (s *Server) MakeRequest(method string, body interface{}, v interface{}) err
 		return errors.New(err)
 	}
 
-	return json.Unmarshal(req.Data, &v)
+	return json.Unmarshal(req.Data, v)
 }
 
+// AddHandler adds new handler to server with
 func (s *Server) AddHandler(method string, fn Handler) {
 	s.hmu.Lock()
 	s.handlers[method] = fn
 	s.hmu.Unlock()
 }
 
+// Serve is starting subscriptions for all registered handlers
 func (s *Server) Serve() error {
 	for method, handler := range s.handlers {
 		sub, err := s.nc.Subscribe(method, func(msg *nats.Msg) {
@@ -92,6 +97,7 @@ func (s *Server) Serve() error {
 	return nil
 }
 
+// Stop unsubscribe from all subscriptions and drain all events
 func (s *Server) Stop() error {
 	for _, sub := range s.subscriptions {
 		if err := sub.Unsubscribe(); err != nil {
